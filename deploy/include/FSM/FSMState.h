@@ -31,16 +31,28 @@ public:
 
                 int fsm_id = FSMStringMap.right.at(target_fsm);
 
-                std::string condition = it->second;
-                unitree::common::dsl::Parser p(condition);
-                auto ast = p.Parse();
-                auto func = unitree::common::dsl::Compile(*ast);
-                registered_checks.emplace_back(
-                    std::make_pair(
-                        [func]()->bool{ return func(FSMState::lowstate->joystick); },
-                        fsm_id
-                    )
+                // std::string condition = it->second;
+                // unitree::common::dsl::Parser p(condition);
+                // auto ast = p.Parse();
+                // auto func = unitree::common::dsl::Compile(*ast);
+                // registered_checks.emplace_back(
+                //     std::make_pair(
+                //         [func]()->bool{ return func(FSMState::lowstate->joystick); },
+                //         fsm_id
+                //     )
+                // );
+                std::string condition = it->second;  
+                registered_checks.emplace_back(  
+                    std::make_pair(  
+                        [condition]()->bool{   
+                            if(!FSMState::keyboard) return false;  
+                            std::string key = FSMState::keyboard->key();  
+                            return key == condition;   
+                        },  
+                        fsm_id  
+                    )  
                 );
+
             }
         }
 
