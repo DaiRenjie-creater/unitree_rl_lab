@@ -30,7 +30,7 @@ def _discover_asset_dir(
     Args:
         env_var: Name of the environment variable that may override the search list.
         candidates: Candidate directory paths to check in order.
-        required_entries: Optional list of sub-paths where at least one must exist inside the directory.
+        required_entries: Optional list of sub-paths that must exist inside the directory.
 
     Raises:
         FileNotFoundError: If none of the provided locations exist and ``optional`` is ``False``.
@@ -48,7 +48,7 @@ def _discover_asset_dir(
         if not resolved_path.is_dir():
             continue
 
-        if required_entries and not any((resolved_path / entry).exists() for entry in required_entries):
+        if required_entries and not all((resolved_path / entry).exists() for entry in required_entries):
             continue
 
         return str(resolved_path)
