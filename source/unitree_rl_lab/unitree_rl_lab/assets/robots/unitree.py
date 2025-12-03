@@ -9,6 +9,7 @@ Reference: https://github.com/unitreerobotics/unitree_ros
 """
 
 import os
+from pathlib import Path
 
 import isaaclab.sim as sim_utils
 from isaaclab.actuators import IdealPDActuatorCfg, ImplicitActuatorCfg
@@ -17,8 +18,116 @@ from isaaclab.utils import configclass
 
 from unitree_rl_lab.assets.robots import unitree_actuators
 
-UNITREE_MODEL_DIR = "/home/evergreen/unitree_demo/unitree_model"  # Replace with the actual path to your unitree_model directory
-UNITREE_ROS_DIR = "path/to/unitree_ros"  # Replace with the actual path to your unitree_ros package
+def _discover_asset_dir(
+    env_var: str,
+    candidates: list[str | Path],
+    required_entries: list[str] | None = None,
+    *,
+    optional: bool = False,
+) -> str | None:
+    """Return the first existing directory from a search list.
+
+    Args:
+        env_var: Name of the environment variable that may override the search list.
+        candidates: Candidate directory paths to check in order.
+        required_entries: Optional list of sub-paths that must exist inside the directory.
+
+    Raises:
+        FileNotFoundError: If none of the provided locations exist and ``optional`` is ``False``.
+    """
+
+    search_paths: list[Path] = []
+    env_path = os.environ.get(env_var)
+    if env_path:
+        search_paths.append(Path(env_path))
+
+    search_paths.extend(Path(p) for p in candidates)
+
+    for path in search_paths:
+        resolved_path = path.expanduser().resolve()
+        if not resolved_path.is_dir():
+            continue
+
+        if required_entries and not all((resolved_path / entry).exists() for entry in required_entries):
+            continue
+
+        return str(resolved_path)
+
+    if optional:
+        return None
+
+    raise FileNotFoundError(
+        f"Unable to locate asset directory. Checked: {[str(p.expanduser().resolve()) for p in search_paths]}"
+    )
+
+
+def _find_repo_root() -> Path:
+    """Find the repository root by walking up the directory tree."""
+
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    # Fallback to the package directory if no marker file is found.
+    return Path(__file__).resolve().parent
+
+
+_REPO_ROOT = _find_repo_root()
+
+# Prefer environment variables, then common local paths (repository root, home folder),
+# and finally the legacy absolute path used in earlier instructions.
+UNITREE_MODEL_DIR = _discover_asset_dir(
+    "UNITREE_MODEL_DIR",
+    candidates=[
+        _REPO_ROOT / "unitree_model",
+        Path.home() / "unitree_model",
+        "/home/evergreen/unitree_demo/unitree_model",
+    ],
+    required_entries=["Go2", "G1", "H1"],
+    optional=True,
+)
+
+UNITREE_ROS_DIR = _discover_asset_dir(
+    "UNITREE_ROS_DIR",
+    candidates=[
+        _REPO_ROOT / "unitree_ros",
+        Path.home() / "unitree_ros",  # Typical location for local clones
+    ],
+    required_entries=["robots"],
+    optional=True,
+)
+
+
+def _resolve_existing_path(root: str | None, relative_path: str | None) -> Path | None:
+    """Return ``Path`` to ``relative_path`` under ``root`` if it exists."""
+
+    if not root or not relative_path:
+        return None
+
+    candidate = Path(root) / relative_path
+    return candidate if candidate.exists() else None
+
+
+def _select_spawn_cfg(usd_subpath: str | None, ros_urdf_subpath: str | None):
+    """Choose between USD and URDF spawn configs based on available assets."""
+
+    usd_path = _resolve_existing_path(UNITREE_MODEL_DIR, usd_subpath)
+    if usd_path:
+        return UnitreeUsdFileCfg(usd_path=str(usd_path))
+
+    urdf_path = _resolve_existing_path(UNITREE_ROS_DIR, ros_urdf_subpath)
+    if urdf_path:
+        return UnitreeUrdfFileCfg(asset_path=str(urdf_path))
+
+    searched = []
+    if usd_subpath:
+        searched.append(Path(UNITREE_MODEL_DIR or "<missing>") / usd_subpath)
+    if ros_urdf_subpath:
+        searched.append(Path(UNITREE_ROS_DIR or "<missing>") / ros_urdf_subpath)
+
+    raise FileNotFoundError(
+        "Unable to locate Unitree asset files. Checked: "
+        + ", ".join(str(path.expanduser().resolve()) for path in searched)
+    )
 
 
 @configclass
@@ -96,8 +205,9 @@ UNITREE_GO2_CFG = UnitreeArticulationCfg(
     # spawn=UnitreeUrdfFileCfg(
     #     asset_path=f"{UNITREE_ROS_DIR}/robots/go2_description/urdf/go2_description.urdf",
     # ),
-    spawn=UnitreeUsdFileCfg(
-        usd_path=f"{UNITREE_MODEL_DIR}/Go2/usd/go2.usd",
+    spawn=_select_spawn_cfg(
+        usd_subpath="Go2/usd/go2.usd",
+        ros_urdf_subpath="robots/go2_description/urdf/go2_description.urdf",
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 0.4),
@@ -132,8 +242,9 @@ UNITREE_GO2W_CFG = UnitreeArticulationCfg(
     # spawn=UnitreeUrdfFileCfg(
     #     asset_path=f"{UNITREE_ROS_DIR}/robots/go2w_description/urdf/go2w_description.urdf",
     # ),
-    spawn=UnitreeUsdFileCfg(
-        usd_path=f"{UNITREE_MODEL_DIR}/Go2W/usd/go2w.usd",
+    spawn=_select_spawn_cfg(
+        usd_subpath="Go2W/usd/go2w.usd",
+        ros_urdf_subpath="robots/go2w_description/urdf/go2w_description.urdf",
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 0.45),
@@ -175,8 +286,9 @@ UNITREE_B2_CFG = UnitreeArticulationCfg(
     # spawn=UnitreeUrdfFileCfg(
     #     asset_path=f"{UNITREE_ROS_DIR}/robots/b2_description/urdf/b2_description.urdf",
     # ),
-    spawn=UnitreeUsdFileCfg(
-        usd_path=f"{UNITREE_MODEL_DIR}/B2/usd/b2.usd",
+    spawn=_select_spawn_cfg(
+        usd_subpath="B2/usd/b2.usd",
+        ros_urdf_subpath="robots/b2_description/urdf/b2_description.urdf",
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 0.58),
@@ -214,8 +326,9 @@ UNITREE_H1_CFG = UnitreeArticulationCfg(
     # spawn=UnitreeUrdfFileCfg(
     #     asset_path=f"{UNITREE_ROS_DIR}/robots/h1_description/urdf/h1.urdf",
     # ),
-    spawn=UnitreeUsdFileCfg(
-        usd_path=f"{UNITREE_MODEL_DIR}/H1/h1/usd/h1.usd",
+    spawn=_select_spawn_cfg(
+        usd_subpath="H1/h1/usd/h1.usd",
+        ros_urdf_subpath="robots/h1_description/urdf/h1.urdf",
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 1.1),
@@ -299,8 +412,9 @@ UNITREE_G1_23DOF_CFG = UnitreeArticulationCfg(
     # spawn=UnitreeUrdfFileCfg(
     #     asset_path=f"{UNITREE_ROS_DIR}/robots/g1_description/g1_23dof_rev_1_0.urdf",
     # ),
-    spawn=UnitreeUsdFileCfg(
-        usd_path=f"{UNITREE_MODEL_DIR}/G1/23dof/usd/g1_23dof_rev_1_0/g1_23dof_rev_1_0.usd",
+    spawn=_select_spawn_cfg(
+        usd_subpath="G1/23dof/usd/g1_23dof_rev_1_0/g1_23dof_rev_1_0.usd",
+        ros_urdf_subpath="robots/g1_description/g1_23dof_rev_1_0.urdf",
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 0.8),
@@ -398,8 +512,9 @@ UNITREE_G1_29DOF_CFG = UnitreeArticulationCfg(
     # spawn=UnitreeUrdfFileCfg(
     #     asset_path=f"{UNITREE_ROS_DIR}/robots/g1_description/g1_29dof_rev_1_0.urdf",
     # ),
-    spawn=UnitreeUsdFileCfg(
-        usd_path=f"{UNITREE_MODEL_DIR}/G1/29dof/usd/g1_29dof_rev_1_0/g1_29dof_rev_1_0.usd",
+    spawn=_select_spawn_cfg(
+        usd_subpath="G1/29dof/usd/g1_29dof_rev_1_0/g1_29dof_rev_1_0.usd",
+        ros_urdf_subpath="robots/g1_description/g1_29dof_rev_1_0.urdf",
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 0.8),
