@@ -17,7 +17,9 @@ FSM:
 
   Passive:
     transitions: 
-      FixStand: LT + up.on_pressed
+      #FixStand: LT + up.on_pressed      
+      FixStand: "1"
+
     mode: [
       1,1,1,1,1,1,
       1,1,1,1,1,1,
@@ -34,8 +36,11 @@ FSM:
     ]
   FixStand:
     transitions: 
-      Passive: LT + B.on_pressed
-      Velocity: RB + X.on_pressed
+      # Passive: LT + B.on_pressed
+      Passive: "3"
+      # Velocity: RB + X.on_pressed
+      Velocity: "2"
+
     kp: [
       100., 100., 100., 150., 40., 40.,
       100., 100., 100., 150., 40., 40.,
@@ -62,16 +67,20 @@ FSM:
     ]
   Velocity:
     transitions: 
-      Passive: LT + B.on_pressed
-      Mimic_Dance_102: LT(2s) + down.on_pressed
-      Mimic_Gangnam_Style: LT(2s) + left.on_pressed
-
-    policy_dir: config/policy/velocity
-    # policy_dir: ../../../logs/rsl_rl/unitree_g1_29dof_velocity
+      # Passive: LT + B.on_pressed
+      # Mimic_Dance_102: LT(2s) + down.on_pressed
+      # Mimic_Gangnam_Style: LT(2s) + left.on_pressed
+      Passive: "3"
+      Mimic_Dance_102: "4"
+      Mimic_Gangnam_Style: "5"
+    #policy_dir: config/policy/velocity
+    policy_dir: ../../../logs/rsl_rl/unitree_g1_29dof_velocity
   Mimic_Dance_102:
     transitions: 
-      Passive: LT + B.on_pressed
-      Velocity: RB + X.on_pressed
+      # Passive: LT + B.on_pressed
+      # Velocity: RB + X.on_pressed
+      Passive: "3"
+      Velocity: "2"
     fps: 60
     motion_file: config/policy/mimic/dance_102/params/G1_Take_102.bvh_60hz.csv
     policy_dir: config/policy/mimic/dance_102/
@@ -79,8 +88,10 @@ FSM:
     time_end: 24.0
   Mimic_Gangnam_Style:
     transitions: 
-      Passive: LT + B.on_pressed
-      Velocity: RB + X.on_pressed
+      # Passive: LT + B.on_pressed
+      # Velocity: RB + X.on_pressed
+      Passive: "3"
+      Velocity: "2"
     fps: 60
     motion_file: config/policy/mimic/gangnam_style/params/G1_gangnam_style_V01.bvh_60hz.csv
     policy_dir: config/policy/mimic/gangnam_style/
