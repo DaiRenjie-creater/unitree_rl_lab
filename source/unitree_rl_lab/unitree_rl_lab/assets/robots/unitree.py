@@ -9,6 +9,7 @@ Reference: https://github.com/unitreerobotics/unitree_ros
 """
 
 import os
+import warnings
 from pathlib import Path
 
 import isaaclab.sim as sim_utils
@@ -124,10 +125,20 @@ def _select_spawn_cfg(usd_subpath: str | None, ros_urdf_subpath: str | None):
     if ros_urdf_subpath:
         searched.append(Path(UNITREE_ROS_DIR or "<missing>") / ros_urdf_subpath)
 
-    raise FileNotFoundError(
-        "Unable to locate Unitree asset files. Checked: "
-        + ", ".join(str(path.expanduser().resolve()) for path in searched)
+    warnings.warn(
+        "Unitree asset files were not found. Continuing with a placeholder configuration. Checked: "
+        + ", ".join(str(path.expanduser().resolve()) for path in searched),
+        stacklevel=2,
     )
+
+    if usd_subpath and UNITREE_MODEL_DIR:
+        return UnitreeUsdFileCfg(usd_path=str(Path(UNITREE_MODEL_DIR) / usd_subpath))
+    if ros_urdf_subpath and UNITREE_ROS_DIR:
+        return UnitreeUrdfFileCfg(asset_path=str(Path(UNITREE_ROS_DIR) / ros_urdf_subpath))
+
+    # Provide a minimal placeholder configuration to keep module importable when no asset roots are set.
+    placeholder_path = usd_subpath or ros_urdf_subpath or "unitree_missing_asset.usd"
+    return UnitreeUsdFileCfg(usd_path=str(Path(placeholder_path)))
 
 
 @configclass
